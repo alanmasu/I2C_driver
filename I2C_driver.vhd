@@ -37,11 +37,12 @@ entity I2C_driver is
            en : in STD_LOGIC;
            rw_n : in STD_LOGIC;
            d_in : in STD_LOGIC_VECTOR (7 downto 0);
-           add_in : in STD_LOGIC_VECTOR (6 downto 0);
-           busy : out STD_LOGIC_VECTOR (0 downto 0);
+           addr_in : in STD_LOGIC_VECTOR (6 downto 0);
            d_out : out STD_LOGIC_VECTOR (7 downto 0);
-           sda : out STD_LOGIC;
-           scl : out STD_LOGIC);
+           busy : out STD_LOGIC;
+           sda : inout STD_LOGIC;
+           scl : inout STD_LOGIC
+    );
 end I2C_driver;
 
 architecture Behavioral of I2C_driver is
@@ -52,67 +53,118 @@ architecture Behavioral of I2C_driver is
          );
     end component;
 
-    type stato_t is (idle, start, writing);
-    type clk_type is (start, stop, clock, no_clok);
+    type stato_t is (idle, start, send_address, read_ack, readed_nack, writing, reading);
+    --type clk_type is (start, stop, clock, no_clok);
     signal i2c_state : stato_t := idle;
-    signal scl_state :  clk_type := no_clok;
-    signal sda_int, scl_int, clk_200m, clk_1_6m: std_logic;
+    --signal scl_state :  clk_type := no_clok;
+    signal sda_int, scl_int : std_logic;
+    signal data, data_rd, addr : std_logic_vector(7 downto 0) ;
+    signal ack, nack : std_logic;
+    -- signal clk_400k : std_logic;
+    --signal clk_200m, clk_1_6m: std_logic;
     
-    signal scl_count : unsigned (9 downto 0);
+    signal scl_count : unsigned (7 downto 0);
+    signal data_count : unsigned (2 downto 0) := (others => '0');
     constant total_cycle : unsigned (7 downto 0) := to_unsigned(250, 8);
     constant half_cycle : unsigned (7 downto 0) := to_unsigned(125, 8);
     constant quarter_cycle : unsigned (7 downto 0) := to_unsigned(62, 8);
 
 begin
-    your_instance_name : clk_wiz
-    port map (  
-        clk_out1 => clk_200m,
-        clk_in1 => clk
-    );
 
-    clk_1_6MHz_gen : process( clk_200m )
-        if rising_edge(clk_200m) then
-            
-        end if ;
-    begin
-        
-    end process ; -- clk_1_6MHz_gen
-
-    i2c_scl_gen : process( ckl, res )
-    begin
+    msf : process( clk, res) begin
         if res = '0' then
+            i2c_state <= idle;
+            sda_int <= '1';
+            scl_int <= '1';
+            d_out <= (others => '0');
             scl_count <= (others => '0');
-            scl_state <= no_clock;
+            data_count <= (others => '0');
+            ack <= '0';
+            nack <= '0';
+            busy <= '0';
         elsif rising_edge(clk) then
-            --Contatore per SCL
-            if scl_state = start or scl_state = stop or scl_state = clock then
-                scl_count <= scl_count + 1;
-            end if ;
-
-            --Stato 
-            case( scl_state ) is
-                when no_clock =>
-                    scl_int <= '1';
-                    scl_count <= (others => '0');
-                when start =>
-                    if scl_counter = quarter_cycle - 1 then
-                        scl_in <= '0';
+            busy <= '1';
+            scl_count <= scl_count + 1;
+            scl_int <= '1';
+            sda_int <= '1';
+            case( i2c_state ) is
+                when idle =>
+                    busy <= '0';
+                    scl_count <= scl_count;
+                    if en = '1' then
+                        data <= d_in;
+                        addr(6 downto 0) <= addr_in;
+                        addr(7) <= rw_n;
+                        i2c_state <= start;
                         scl_count <= (others => '0');
-                        scl_state <= clock;
+                    end if;
+                when start =>
+                    if scl_count < quarter_cycle then
+                        sda_int <= '0';
+                    elsif scl_count >= quarter_cycle and scl_count < half_cycle then
+                        sda_int <= '0';
+                        scl_int <= '0';
+                    elsif scl_count >= half_cycle then
+                        sda_int <= '0';
+                        scl_int <= '0';
+                        i2c_state <= send_address;
+                        scl_count <= quarter_cycle;-- + 1;
                     end if ;
-                when clock => 
-                    if scl_counter < semi_cycle then
-                        scl_in <= '0';
-                    elsif scl_counter < total_cycle then
-                        scl_in <= '1';
+                when send_address =>
+                    sda_int <= sda_int;
+                    --SCL gen
+                    if scl_count < half_cycle then
+                        scl_int <= '0';
+                    elsif scl_count >= half_cycle and scl_count < total_cycle then
+                        sda_int <= '1';
+                    elsif scl_count = total_cycle then
+                        scl_count <= (others => '0');
                     end if ;
-                when stop =>
-                    
-                    
+                    --SDA gen
+                    if scl_count < half_cycle then
+                        if scl_count = quarter_cycle then
+                            data_count <= data_count - 1;
+                            sda_int <= '0';
+                        elsif scl_count > quarter_cycle then
+                            sda_int <= data(to_integer(data_count));
+                        end if ;
+                    elsif scl_count >= half_cycle then
+                        if scl_count = total_cycle and data_count = 0 then
+                            sda_int <= '1';
+                            i2c_state <= read_ack;
+                        end if ;
+                    end if ;
+                when read_ack => 
+                    --SCL gen
+                    if scl_count < half_cycle then
+                        scl_int <= '0';
+                    elsif scl_count >= half_cycle and scl_count < total_cycle then
+                        sda_int <= '1';
+                    elsif scl_count = total_cycle then
+                        scl_count <= (others => '0');
+                    end if ;
+                    --SDA gen
+                    if scl_count = half_cycle + quarter_cycle then
+                        if sda = '0' then
+                            ack <= '1';
+                        elsif sda = '1' then
+                            nack <= '0';
+                        end if ;
+                    elsif scl_count = total_cycle then
+                        scl_count <= (others => '0');
+                        if ack = '1' then
+                            if rw_n = '1' then
+                                i2c_state <= reading;
+                            elsif rw_n = '0'  then
+                                i2c_state <= writing;
+                            end if ;
+                        end if ;
+                    end if ;
+                when others => 
+                    i2c_state <= idle;
             end case ;
-        end if ;        
-    end process ; -- i2c_scl_gen
-                   
+        end if ;
+    end process ; -- msf
     --Equazioni
     sda <= 'Z' when sda_int = '1' else '0';
     scl <= 'Z' when scl_int = '1' else '0';
