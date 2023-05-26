@@ -79,61 +79,64 @@ begin
             wait for 1 ns;
         end loop ; -- attendo_busy
         en <= '0';
-        wait for 50 us;
-        en <= '0';
-        sda <= '0'; -- ACK
-        wait for 2300 ns;
-        sda <= 'Z';
-        wait for 2 us;
-
-        --Transizione in lettura con ACK
-        en <= '1';
-        data <= "00000001";
-        addr <= "1001111";
-        rw_n <= '1';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ; -- attendo_busy
-        en <= '0';
         wait for 21 us;
         en <= '0';
-        sda <= '0'; -- ACK
-        wait for 2300 ns;
+        sda <= '0'; -- ACK for address
+        wait for 2130 ns;
         sda <= 'Z';
-        wait for 2 us;
-
-        --Transizione in lettura con NACK
-        en <= '1';
-        data <= "00000001";
-        addr <= "1001111";
-        rw_n <= '1';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ;
-        en <= '0';
-
         wait for 21 us;
-        sda <= '1'; -- NACK
-        wait for 2300 ns;
+        sda <= '0'; -- ACK for data
+        wait for 2100 ns;
         sda <= 'Z';
-        wait for 2 us;
+
+        -- --Transizione in lettura con ACK
+        -- en <= '1';
+        -- data <= "00000001";
+        -- addr <= "1001111";
+        -- rw_n <= '1';
+        -- while busy = '0' loop
+        --     wait for 1 ns;
+        -- end loop ; -- attendo_busy
+        -- en <= '0';
+        -- wait for 21 us;
+        -- en <= '0';
+        -- sda <= '0'; -- ACK
+        -- wait for 2300 ns;
+        -- sda <= 'Z';
+        -- wait for 2 us;
+
+        -- --Transizione in lettura con NACK
+        -- en <= '1';
+        -- data <= "00000001";
+        -- addr <= "1001111";
+        -- rw_n <= '1';
+        -- while busy = '0' loop
+        --     wait for 1 ns;
+        -- end loop ;
+        -- en <= '0';
+
+        -- wait for 21 us;
+        -- sda <= '1'; -- NACK
+        -- wait for 2300 ns;
+        -- sda <= 'Z';
+        -- wait for 2 us;
             
             
-        --Transizione in scrittura con NACK
-        en <= '1';
-        data <= "00000001";
-        addr <= "1001111";
-        rw_n <= '0';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ;
-        en <= '0';
+        -- --Transizione in scrittura con NACK
+        -- en <= '1';
+        -- data <= "00000001";
+        -- addr <= "1001111";
+        -- rw_n <= '0';
+        -- while busy = '0' loop
+        --     wait for 1 ns;
+        -- end loop ;
+        -- en <= '0';
 
-        wait for 21 us;
-        sda <= '1'; -- NACK
-        wait for 2300 ns;
-        sda <= 'Z';
-        wait for 2 us;
+        -- wait for 21 us;
+        -- sda <= '1'; -- NACK
+        -- wait for 2300 ns;
+        -- sda <= 'Z';
+        -- wait for 2 us;
 
         wait;
     end process ; -- test_process

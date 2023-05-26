@@ -93,6 +93,7 @@ begin
             busy <= '1';
             scl_count <= scl_count + 1;
             scl_int <= '1';
+            --sda_int <= '1'; --Attenzione
             ack <= ack;
             nack <= nack;
             to_start <= to_start;
@@ -122,6 +123,7 @@ begin
                     to_start <= '0';
                     if scl_count < quarter_cycle then
                         sda_int <= '0';
+                        scl_int <= '1';
                     elsif scl_count >= quarter_cycle and scl_count < half_cycle then
                         sda_int <= '0';
                         scl_int <= '0';
@@ -193,6 +195,8 @@ begin
                         scl_count <= (others => '0');
                     end if;
                 when reading =>
+                    ack <= '0';
+                    nack <= '0';
                     if scl_count = quarter_cycle then
                         data_count <= data_count - 1;
                     elsif scl_count = half_cycle + quarter_cycle then
@@ -209,12 +213,14 @@ begin
                         --     to_stop <= '1';
                         -- end if ;
                     end if ;
-                when writing => 
+                when writing =>
+                    ack <= '0';
+                    nack <= '0';
                     if scl_count = quarter_cycle then
                         data_count <= data_count - 1;
                     elsif scl_count > quarter_cycle and scl_count < half_cycle then
                         sda_int <= data(to_integer(data_count));
-                    elsif scl_count = total_cycle then
+                    elsif scl_count = total_cycle and data_count = 0 then
                         to_stop <= '1';
                         i2c_state <= read_ack;
                     end if ;
@@ -231,8 +237,10 @@ begin
                     end if ;
                 when stop => 
                     to_stop <= '0';
-                    if scl_count > half_cycle and scl_count < half_cycle + quarter_cycle then
-                        sda <= '0';
+                    if scl_count > quarter_cycle and scl_count < half_cycle + quarter_cycle then
+                        sda_int <= '0';
+                    elsif scl_count >= half_cycle + quarter_cycle and scl_count < total_cycle then
+                        sda_int <= '1';
                     elsif scl_count = total_cycle then
                         i2c_state <= idle;
                     end if ;
