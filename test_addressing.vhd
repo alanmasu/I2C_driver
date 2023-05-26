@@ -36,7 +36,7 @@ entity test_addressing is
 end test_addressing;
 
 architecture Behavioral of test_addressing is
-    signal clk, res, en, busy, rw_n, sda, scl : std_logic := '0';
+    signal clk, res, en, busy, error, rw_n, sda, scl : std_logic := '0';
     signal addr : std_logic_vector(6 downto 0) := (others => '0');
     signal data, data_rd : std_logic_vector(7 downto 0) := (others => '0');
 begin
@@ -50,6 +50,7 @@ begin
         addr_in => addr,
         d_out => data_rd,
         busy => busy,
+        error => error,
         sda => sda,
         scl => scl
     );
@@ -68,19 +69,19 @@ begin
     test_process : process begin
         sda <= 'Z';
         wait for 9 ns;
-
-        --Transizione in lettura con NACK
+        
+        --Transizione in scrittura con ACK
         en <= '1';
         data <= "00000001";
         addr <= "1001111";
-        rw_n <= '1';
+        rw_n <= '0';
         while busy = '0' loop
             wait for 1 ns;
-        end loop ;
+        end loop ; -- attendo_busy
         en <= '0';
-
-        wait for 21 us;
-        sda <= '1'; -- NACK
+        wait for 50 us;
+        en <= '0';
+        sda <= '0'; -- ACK
         wait for 2300 ns;
         sda <= 'Z';
         wait for 2 us;
@@ -101,7 +102,23 @@ begin
         sda <= 'Z';
         wait for 2 us;
 
+        --Transizione in lettura con NACK
+        en <= '1';
+        data <= "00000001";
+        addr <= "1001111";
+        rw_n <= '1';
+        while busy = '0' loop
+            wait for 1 ns;
+        end loop ;
+        en <= '0';
 
+        wait for 21 us;
+        sda <= '1'; -- NACK
+        wait for 2300 ns;
+        sda <= 'Z';
+        wait for 2 us;
+            
+            
         --Transizione in scrittura con NACK
         en <= '1';
         data <= "00000001";
@@ -118,21 +135,6 @@ begin
         sda <= 'Z';
         wait for 2 us;
 
-        --Transizione in scrittura con ACK
-        en <= '1';
-        data <= "00000001";
-        addr <= "1001111";
-        rw_n <= '0';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ; -- attendo_busy
-        en <= '0';
-        wait for 21 us;
-        en <= '0';
-        sda <= '0'; -- ACK
-        wait for 2300 ns;
-        sda <= 'Z';
-        wait for 2 us;
         wait;
     end process ; -- test_process
 

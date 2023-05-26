@@ -39,7 +39,7 @@ entity I2C_driver is
            d_in : in STD_LOGIC_VECTOR (7 downto 0);
            addr_in : in STD_LOGIC_VECTOR (6 downto 0);
            d_out : out STD_LOGIC_VECTOR (7 downto 0);
-           busy : out STD_LOGIC;
+           busy, error : out STD_LOGIC;
            sda : inout STD_LOGIC;
            scl : inout STD_LOGIC
     );
@@ -53,7 +53,7 @@ architecture Behavioral of I2C_driver is
          );
     end component;
 
-    type stato_t is (idle, start, send_address, read_ack, readed_nack, writing, reading);
+    type stato_t is (idle, start, send_address, read_ack, readed_nack, writing, reading, write_ack, stop);
     --type clk_type is (start, stop, clock, no_clok);
     signal i2c_state : stato_t := idle;
     --signal scl_state :  clk_type := no_clok;
@@ -64,11 +64,12 @@ architecture Behavioral of I2C_driver is
     --signal clk_200m, clk_1_6m: std_logic;
     
     signal scl_count : unsigned (7 downto 0);
+    signal to_start, to_stop : std_logic;
     signal data_count : unsigned (2 downto 0) := (others => '0');
-    constant total_cycle : unsigned (7 downto 0) := to_unsigned(250, 8);
-    constant half_cycle : unsigned (7 downto 0) := to_unsigned(125, 8);
-    constant quarter_cycle : unsigned (7 downto 0) := to_unsigned(62, 8);
-    signal test : std_logic := '0';
+    constant total_cycle : unsigned (7 downto 0) := to_unsigned(249, 8);    --250 cicli * 10 ns - 1 ciclo * 10 ns
+    constant half_cycle : unsigned (7 downto 0) := to_unsigned(124, 8);     --125 cicli * 10 ns - 1 ciclo * 10 ns
+    constant quarter_cycle : unsigned (7 downto 0) := to_unsigned(61, 8);   --62  cicli * 10 ns - 1 ciclo * 10 ns
+    
 
 begin
 
@@ -83,13 +84,27 @@ begin
             ack <= '0';
             nack <= '0';
             busy <= '0';
+            error <= '0';
+            to_start <= '0';
+            to_stop  <= '0';
         elsif rising_edge(clk) then
+            --Defaults
+            error <= '0';
             busy <= '1';
             scl_count <= scl_count + 1;
             scl_int <= '1';
-            sda_int <= '1';
             ack <= ack;
             nack <= nack;
+            to_start <= to_start;
+            to_stop  <= to_stop;
+
+            --SCL gen
+            if scl_count < half_cycle then
+                scl_int <= '0';
+            elsif scl_count >= half_cycle and scl_count < total_cycle then
+                sda_int <= '1';
+            end if;
+
             case( i2c_state ) is
                 when idle =>
                     busy <= '0';
@@ -104,6 +119,7 @@ begin
                         scl_count <= (others => '0');
                     end if;
                 when start =>
+                    to_start <= '0';
                     if scl_count < quarter_cycle then
                         sda_int <= '0';
                     elsif scl_count >= quarter_cycle and scl_count < half_cycle then
@@ -117,11 +133,7 @@ begin
                     end if ;
                 when send_address =>
                     --SCL gen
-                    if scl_count < half_cycle then
-                        scl_int <= '0';
-                    elsif scl_count >= half_cycle and scl_count < total_cycle then
-                        sda_int <= '1';
-                    elsif scl_count = total_cycle then
+                    if scl_count = total_cycle then
                         scl_count <= (others => '0');
                     end if ;
 
@@ -133,7 +145,6 @@ begin
                             --sda_int <= '0';
                         elsif scl_count > quarter_cycle then
                             sda_int <= addr(to_integer(data_count));
-                            --test <= addr()
                         end if ;
                     elsif scl_count >= half_cycle then
                         if scl_count = total_cycle and data_count = 0 then
@@ -143,11 +154,7 @@ begin
                     end if ;
                 when read_ack => 
                     --SCL gen
-                    if scl_count < half_cycle then
-                        scl_int <= '0';
-                    elsif scl_count >= half_cycle and scl_count < total_cycle then
-                        sda_int <= '1';
-                    elsif scl_count = total_cycle then
+                    if scl_count = total_cycle then
                         scl_count <= (others => '0');
                     end if ;
                     --SDA gen
@@ -160,7 +167,9 @@ begin
                     elsif scl_count = total_cycle then
                         scl_count <= (others => '0');
                         if ack = '1' then
-                            if rw_n = '1' then
+                            if to_stop = '1' then
+                                i2c_state <= stop;
+                            elsif rw_n = '1' then
                                 i2c_state <= reading;
                             elsif rw_n = '0'  then
                                 i2c_state <= writing;
@@ -170,7 +179,9 @@ begin
                         end if ;
                     end if ;
                 when readed_nack => 
+                    scl_int <= '1';
                     busy <= '0';
+                    error <= '1';
                     scl_count <= scl_count;
                     nack <= '0';
                     ack <= '0';
@@ -181,9 +192,49 @@ begin
                         i2c_state <= start;
                         scl_count <= (others => '0');
                     end if;
-                when reading => 
-                    if scl_count then
-                        
+                when reading =>
+                    if scl_count = quarter_cycle then
+                        data_count <= data_count - 1;
+                    elsif scl_count = half_cycle + quarter_cycle then
+                        data_rd(to_integer(data_count)) <= sda;
+                    elsif scl_count = total_cycle and data_count = 0 then
+                        i2c_state <= write_ack;
+                        -- if en = '1' then
+                        --     data <= d_in;
+                        --     addr(7 downto 1) <= addr_in;
+                        --     addr(0) <= rw_n;
+                        --     scl_count <= (others => '0');
+                        --     to_start <= '1';
+                        -- else 
+                        --     to_stop <= '1';
+                        -- end if ;
+                    end if ;
+                when writing => 
+                    if scl_count = quarter_cycle then
+                        data_count <= data_count - 1;
+                    elsif scl_count > quarter_cycle and scl_count < half_cycle then
+                        sda_int <= data(to_integer(data_count));
+                    elsif scl_count = total_cycle then
+                        to_stop <= '1';
+                        i2c_state <= read_ack;
+                    end if ;
+                when write_ack => 
+                    if scl_count > half_cycle and scl_count < total_cycle then
+                        sda_int <= '0';
+                    elsif scl_count = total_cycle then
+                        i2c_state <= idle;
+                        -- if to_start = '1' and to_stop = '0' then
+                        --     i2c_status <= start;
+                        -- elsif to_start = '0' and to_stop = '1' then
+                        --     i2c_stop <= stop;
+                        -- end if ;
+                    end if ;
+                when stop => 
+                    to_stop <= '0';
+                    if scl_count > half_cycle and scl_count < half_cycle + quarter_cycle then
+                        sda <= '0';
+                    elsif scl_count = total_cycle then
+                        i2c_state <= idle;
                     end if ;
                 when others => 
                     i2c_state <= idle;
@@ -193,4 +244,5 @@ begin
     --Equazioni
     sda <= 'Z' when sda_int = '1' else '0';
     scl <= 'Z' when scl_int = '1' else '0';
+
 end Behavioral;
