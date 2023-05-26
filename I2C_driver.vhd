@@ -102,7 +102,7 @@ begin
             if scl_count < half_cycle then
                 scl_int <= '0';
             elsif scl_count >= half_cycle and scl_count < total_cycle then
-                sda_int <= '1';
+                scl_int <= '1';
             end if;
 
             case( i2c_state ) is
