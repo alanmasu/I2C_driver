@@ -70,76 +70,93 @@ begin
         sda <= 'Z';
         --wait for 9 ns;
         wait for 10 ns;
-        
+
         --Transizione in scrittura con ACK
         en <= '1';
         data <= "00000001";
         addr <= "1001111";
         rw_n <= '0';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ; -- attendo_busy
+        wait until busy = '1';
+
         en <= '0';
-        wait for 21 us;
+        wait for 21.25 us;
         en <= '0';
         sda <= '0'; -- ACK for address
-        wait for 2130 ns;
+        wait until scl = '0' or busy = '0';
         sda <= 'Z';
-        wait for 21 us;
+        wait for 20.125 us;
         sda <= '0'; -- ACK for data
-        wait for 2100 ns;
+        wait until scl = '0' or busy = '0';
         sda <= 'Z';
-
+        
         --Transizione in lettura con ACK
+        wait until busy = '0';
+        en <= '1';
+        data <= "10101010";
+        addr <= "1001111";
+        rw_n <= '1';
+        wait until busy = '1';
+        en <= '0';
+        wait for 20.63 us;
+        wait for 0.625  us;
+        sda <= '0'; -- Address ACK 
+        wait until scl = '0' or busy = '0';
+        sda <= 'Z';
+        --Writing data
+        if error = '0' then
+            for i in 0 to 7 loop
+                wait for 0.625 us;
+                sda <= data(7-i);
+                wait for 1.25 us;
+                wait for 0.625 us;
+            end loop ;
+        end if ;
+        sda <= 'Z';
+        
+        --Transizione in scrittura con NACK
+        wait until busy = '0';
         en <= '1';
         data <= "00000001";
         addr <= "1001111";
-        rw_n <= '1';
-        while busy = '0' loop
-            wait for 1 ns;
-        end loop ; -- attendo_busy
+        rw_n <= '0';
+        wait until busy = '1';
+
         en <= '0';
-        wait for 21 us;
-        sda <= '0'; -- Address ACK 
-        wait for 2300 ns;
+        wait for 21.25 us;
+        en <= '0';
+        sda <= '0'; -- ACK for address
+        wait until scl = '0';--for 2.5 us;
         sda <= 'Z';
-        wait for 2 us;
-
-        -- --Transizione in lettura con NACK
-        -- en <= '1';
-        -- data <= "00000001";
-        -- addr <= "1001111";
-        -- rw_n <= '1';
-        -- while busy = '0' loop
-        --     wait for 1 ns;
-        -- end loop ;
-        -- en <= '0';
-
-        -- wait for 21 us;
-        -- sda <= '1'; -- NACK
-        -- wait for 2300 ns;
-        -- sda <= 'Z';
-        -- wait for 2 us;
-            
-            
-        -- --Transizione in scrittura con NACK
-        -- en <= '1';
-        -- data <= "00000001";
-        -- addr <= "1001111";
-        -- rw_n <= '0';
-        -- while busy = '0' loop
-        --     wait for 1 ns;
-        -- end loop ;
-        -- en <= '0';
-
-        -- wait for 21 us;
-        -- sda <= '1'; -- NACK
-        -- wait for 2300 ns;
-        -- sda <= 'Z';
-        -- wait for 2 us;
+        wait for 20.125 us;
+        sda <= '1'; -- NACK for data
+        wait until scl = '0' or error = '1';
+        sda <= 'Z';
+        
+        --Transizione in lettura con NACK
+        --wait until busy = '0';
+        en <= '1';
+        data <= "10101010";
+        addr <= "1001111";
+        rw_n <= '1';
+        wait until busy = '1';
+        en <= '0';
+        wait for 20.63 us;
+        wait for 0.625  us;
+        sda <= '1'; -- Address NACK 
+        wait until scl = '0' or busy = '0';
+        sda <= 'Z';
+        --Writing data
+        if error = '0' then
+            for i in 0 to 7 loop
+                wait for 0.625 us;
+                sda <= data(7-i);
+                wait for 1.25 us;
+                wait for 0.625 us;
+            end loop ; -- 
+        end if ;
+        sda <= 'Z';
 
         wait;
     end process ; -- test_process
 
-    --scl <= '1' when scl = 'Z' else '0';
 end Behavioral;
