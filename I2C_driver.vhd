@@ -14,8 +14,11 @@
 -- 
 -- Revision:
 -- Revision 0.01 - File Created
--- Additional Comments:
--- 
+----------------------------------------------------------------------------------
+-- [TO DO]:
+
+    -- BISOGNA CONTROLLARE TRA 10ns E 20ns COME MAI SCL VADA A '0';
+
 ----------------------------------------------------------------------------------
 
 
@@ -58,13 +61,13 @@ architecture Behavioral of I2C_driver is
     signal i2c_state : stato_t := idle;
     --signal scl_state :  clk_type := no_clok;
     signal sda_int, scl_int : std_logic;
-    signal data, data_rd, addr : std_logic_vector(7 downto 0) ;
+    signal data, data_rd, addr : std_logic_vector(7 downto 0) := (others => '0');
     signal ack, nack : std_logic;
     -- signal clk_400k : std_logic;
     --signal clk_200m, clk_1_6m: std_logic;
     
-    signal scl_count : unsigned (7 downto 0);
-    signal to_start, to_stop : std_logic;
+    signal scl_count : unsigned (7 downto 0) := (others => '0');
+    signal to_start, to_stop : std_logic := '0';
     signal data_count : unsigned (2 downto 0) := (others => '0');
     constant total_cycle : unsigned (7 downto 0) := to_unsigned(249, 8);    --250 cicli * 10 ns - 1 ciclo * 10 ns
     constant half_cycle : unsigned (7 downto 0) := to_unsigned(124, 8);     --125 cicli * 10 ns - 1 ciclo * 10 ns
@@ -81,6 +84,7 @@ begin
             d_out <= (others => '0');
             scl_count <= (others => '0');
             data_count <= (others => '0');
+            addr <= (others => '0');
             ack <= '0';
             nack <= '0';
             busy <= '0';
@@ -92,8 +96,6 @@ begin
             error <= '0';
             busy <= '1';
             scl_count <= scl_count + 1;
-            scl_int <= '1';
-            --sda_int <= '1'; --Attenzione
             ack <= ack;
             nack <= nack;
             to_start <= to_start;
@@ -108,11 +110,13 @@ begin
 
             case( i2c_state ) is
                 when idle =>
+                    scl_int <= '1';
                     busy <= '0';
                     nack <= '0';
                     ack <= '0';
                     scl_count <= scl_count;
                     if en = '1' then
+                        sda_int <= '0';
                         data <= d_in;
                         addr(7 downto 1) <= addr_in;
                         addr(0) <= rw_n;
@@ -131,7 +135,7 @@ begin
                         sda_int <= '0';
                         scl_int <= '0';
                         i2c_state <= send_address;
-                        scl_count <= quarter_cycle;-- + 1;
+                        scl_count <= quarter_cycle + 1;
                     end if ;
                 when send_address =>
                     --SCL gen
@@ -142,9 +146,8 @@ begin
                     --SDA gen
                     sda_int <= sda_int;
                     if scl_count < half_cycle then
-                        if scl_count = quarter_cycle then
+                        if scl_count = quarter_cycle + 1 then
                             data_count <= data_count - 1;
-                            --sda_int <= '0';
                         elsif scl_count > quarter_cycle then
                             sda_int <= addr(to_integer(data_count));
                         end if ;

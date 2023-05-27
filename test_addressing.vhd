@@ -68,7 +68,8 @@ begin
 
     test_process : process begin
         sda <= 'Z';
-        wait for 9 ns;
+        --wait for 9 ns;
+        wait for 10 ns;
         
         --Transizione in scrittura con ACK
         en <= '1';
@@ -89,21 +90,20 @@ begin
         wait for 2100 ns;
         sda <= 'Z';
 
-        -- --Transizione in lettura con ACK
-        -- en <= '1';
-        -- data <= "00000001";
-        -- addr <= "1001111";
-        -- rw_n <= '1';
-        -- while busy = '0' loop
-        --     wait for 1 ns;
-        -- end loop ; -- attendo_busy
-        -- en <= '0';
-        -- wait for 21 us;
-        -- en <= '0';
-        -- sda <= '0'; -- ACK
-        -- wait for 2300 ns;
-        -- sda <= 'Z';
-        -- wait for 2 us;
+        --Transizione in lettura con ACK
+        en <= '1';
+        data <= "00000001";
+        addr <= "1001111";
+        rw_n <= '1';
+        while busy = '0' loop
+            wait for 1 ns;
+        end loop ; -- attendo_busy
+        en <= '0';
+        wait for 21 us;
+        sda <= '0'; -- Address ACK 
+        wait for 2300 ns;
+        sda <= 'Z';
+        wait for 2 us;
 
         -- --Transizione in lettura con NACK
         -- en <= '1';
