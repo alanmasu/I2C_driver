@@ -64,7 +64,7 @@ architecture Behavioral of I2C_temp_sensor_controller is
     signal temp_corr   : SIGNED(15 downto 0);           --temp in °C
     signal display_data: std_logic_vector(31 downto 0); --Data to print on LCD
     signal time_wait_100ms : integer := 10_000_000;
-    signal time_wait_10us : integer := 100_000_000;
+    signal time_wait_10us : integer := 769_000;
     signal busy_cnt : INTEGER ;
     signal counter: INTEGER ;
 
@@ -177,8 +177,8 @@ begin
                 --output the temperature data
                 WHEN output_result =>
                     display_data(31 downto 16) <= (others => '0');
-                    display_data(15 downto 0 ) <= std_logic_vector(temp_corr);
-                    LED <= std_logic_vector(temp_corr(15 DOWNTO 8));                --write temperature data to output
+                    display_data(15 downto 0 ) <= temp_data;      --std_logic_vector(temp_corr);
+                    LED <= temp_data(15 DOWNTO 8);                --write temperature data to output
                     state <= pause;                               --pause 1.3us before next transaction
                 --default to start state
                 WHEN OTHERS =>
@@ -187,6 +187,6 @@ begin
             END CASE;
         END IF;
     END PROCESS;   
-    temp_corr <= signed(temp_data) - to_signed(120, 16); 
+    temp_corr <= to_signed(120, 16) - signed(temp_data); 
     
 end Behavioral;
