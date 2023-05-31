@@ -113,7 +113,7 @@ begin
             CASE state IS                                       --state machine
             --give temp sensor 100ms to power up before communicating
                 WHEN start =>
-                    IF(counter < time_wait_100ms) THEN          --100ms not yet reached
+                    IF(counter < 10) THEN          --100ms not yet reached
                         counter <= counter + 1;                 --increment counter
                     ELSE                                        --100ms reached
                         counter <= 0;                           --clear counter
@@ -142,7 +142,7 @@ begin
                     end if;
                 --pause 1s between transactions
                 WHEN pause =>
-                    IF(counter < time_wait_10us) THEN             --1.3us not yet reached
+                    IF(counter < 20) THEN             --1.3us not yet reached
                         counter <= counter + 1;                   --increment counter
                     ELSE                                          --1.3us reached
                         counter <= 0;                             --clear counter

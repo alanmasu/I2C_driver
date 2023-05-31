@@ -108,6 +108,7 @@ begin
             case( i2c_state ) is
                 when idle =>
                     scl_int <= '1';
+                    sda_int <= '1';
                     busy <= '0';
                     nack <= '0';
                     ack <= '0';
